@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { View } from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { View, Text } from 'react-native';
+// import Icon from 'react-native-vector-icons/Ionicons';
 import { pink, collapsedHeight, initiallyExpanded } from './constants';
 import { HeavyLoad } from './HeavyLoad';
 
@@ -37,7 +37,8 @@ export const Card = ({ expandable, heavyLoad, height }) => {
             backgroundColor: 'lightgray',
           }}
         />
-        {expandable && <Icon name={icon} size={30} color={pink} />}
+        {/* {expandable && <Icon name={icon} size={30} color={pink} />} */}
+        {expandable && <Text>Expandable</Text>}
       </View>
     </>
   );
