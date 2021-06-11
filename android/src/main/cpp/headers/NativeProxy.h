@@ -5,8 +5,12 @@
 #include <react/jni/CxxModuleWrapper.h>
 #include <react/jni/JMessageQueueThread.h>
 #include <react/jni/WritableNativeMap.h>
+#include "NativeReanimatedModule.h"
+#include <ReactCommon/CallInvokerHolder.h>
+#include <react/jni/JavaScriptExecutorHolder.h>
 #include <memory>
 #include <unordered_map>
+
 
 #include "Scheduler.h"
 #include "AndroidScheduler.h"
@@ -48,7 +52,11 @@ class EventHandler : public HybridClass<EventHandler> {
   void receiveEvent(
      jni::alias_ref<JString> eventKey,
      jni::alias_ref<react::WritableMap> event) {
-    handler_(eventKey->toString(), event->toString());
+     std::string eventAsString = "{NativeMap:null}";
+     if (event != nullptr) {
+        eventAsString = event->toString();
+     }
+    handler_(eventKey->toString(), eventAsString);
   }
 
   static void registerNatives() {
@@ -74,6 +82,7 @@ class NativeProxy : public jni::HybridClass<NativeProxy> {
   static jni::local_ref<jhybriddata> initHybrid(
         jni::alias_ref<jhybridobject> jThis,
         jlong jsContext,
+        jni::alias_ref<facebook::react::CallInvokerHolder::javaobject> jsCallInvokerHolder,
         jni::alias_ref<AndroidScheduler::javaobject> scheduler);
   static void registerNatives();
 
@@ -82,16 +91,22 @@ class NativeProxy : public jni::HybridClass<NativeProxy> {
   friend HybridBase;
   jni::global_ref<NativeProxy::javaobject> javaPart_;
   jsi::Runtime *runtime_;
+  std::shared_ptr<facebook::react::CallInvoker> jsCallInvoker_;
+  std::shared_ptr<NativeReanimatedModule> _nativeReanimatedModule;
   std::shared_ptr<Scheduler> scheduler_;
 
   void installJSIBindings();
+  bool isAnyHandlerWaitingForEvent(std::string);
   void requestRender(std::function<void(double)> onRender);
   void registerEventHandler(std::function<void(std::string,std::string)> handler);
   void updateProps(jsi::Runtime &rt, int viewTag, const jsi::Object &props);
+  void scrollTo(int viewTag, double x, double y, bool animated);
+  std::vector<std::pair<std::string, double>> measure(int viewTag);
 
   explicit NativeProxy(
       jni::alias_ref<NativeProxy::jhybridobject> jThis,
       jsi::Runtime *rt,
+      std::shared_ptr<facebook::react::CallInvoker> jsCallInvoker,
       std::shared_ptr<Scheduler> scheduler);
 };
 

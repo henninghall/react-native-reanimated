@@ -1,21 +1,22 @@
 #pragma once
 
+#include "ShareableValue.h"
+#include "NativeReanimatedModule.h"
 #include <stdio.h>
 #include <jsi/jsi.h>
-#include "Shareable.h"
-#include "NativeReanimatedModule.h"
-
-namespace reanimated {
 
 using namespace facebook;
 
+namespace reanimated {
+
 class MapperRegistry;
 
-class Mapper {
+class Mapper : public std::enable_shared_from_this<Mapper> {
   friend MapperRegistry;
 private:
   unsigned long id;
-  jsi::Function mapper;
+  NativeReanimatedModule *module;
+  std::shared_ptr<jsi::Function> mapper;
   std::vector<std::shared_ptr<MutableValue>> inputs;
   std::vector<std::shared_ptr<MutableValue>> outputs;
   bool dirty = true;
@@ -23,10 +24,11 @@ private:
 public:
   Mapper(NativeReanimatedModule *module,
          unsigned long id,
-         jsi::Function &&mapper,
+         std::shared_ptr<jsi::Function> mapper,
          std::vector<std::shared_ptr<MutableValue>> inputs,
          std::vector<std::shared_ptr<MutableValue>> outputs);
   void execute(jsi::Runtime &rt);
+  virtual ~Mapper();
 };
 
 }

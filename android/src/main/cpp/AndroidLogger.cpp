@@ -3,7 +3,10 @@
 #include <android/log.h>
 #define APPNAME "NATIVE_REANIMATED"
 
-std::unique_ptr<LoggerInterface> Logger::instance = std::unique_ptr<AndroidLogger>(new AndroidLogger());
+namespace reanimated
+{
+
+std::unique_ptr<LoggerInterface> Logger::instance = std::make_unique<AndroidLogger>();
 
 void AndroidLogger::log(const char* str) {
     __android_log_print(ANDROID_LOG_VERBOSE, APPNAME, "%s", str);
@@ -19,4 +22,6 @@ void AndroidLogger::log(int i) {
 
 void AndroidLogger::log(bool b) {
     __android_log_print(ANDROID_LOG_VERBOSE, APPNAME, "%s", b ? "true" : "false");
+}
+
 }

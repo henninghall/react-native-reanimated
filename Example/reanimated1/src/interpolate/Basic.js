@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import Animated, { Easing } from 'react-native-reanimated';
+import Animated, { EasingNode } from 'react-native-reanimated';
 import Box from '../Box';
 import Row from '../Row';
 
@@ -14,7 +14,7 @@ const {
   timing,
   Value,
   Clock,
-  interpolate,
+  interpolateNode,
 } = Animated;
 
 function runTiming(clock, value, dest) {
@@ -28,7 +28,7 @@ function runTiming(clock, value, dest) {
   const config = {
     duration: 500,
     toValue: new Value(0),
-    easing: Easing.inOut(Easing.ease),
+    easing: EasingNode.inOut(EasingNode.ease),
   };
 
   const reset = [
@@ -57,15 +57,27 @@ export default class Basic extends Component {
     super(props);
     const clock = new Clock();
     const base = runTiming(clock, -1, 1);
-    this._transX = interpolate(base, {
+    this._transX = interpolateNode(base, {
       inputRange: [-1, 1],
       outputRange: [-100, 100],
     });
+    this._rotateZ = interpolateNode(base, {
+      inputRange: [-1, 1],
+      outputRange: ['0rad', `${Math.PI}rad`],
+    });
   }
+
   render() {
     return (
       <Row>
-        <Box style={{ transform: [{ translateX: this._transX }] }} />
+        <Box
+          style={{
+            transform: [
+              { translateX: this._transX },
+              { rotateZ: this._rotateZ },
+            ],
+          }}
+        />
       </Row>
     );
   }

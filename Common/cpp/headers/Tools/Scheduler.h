@@ -1,4 +1,3 @@
-
 #pragma once
 
 #include <queue>
@@ -6,6 +5,10 @@
 #include <mutex>
 #include <condition_variable>
 #include <functional>
+#include <ReactCommon/CallInvoker.h>
+
+namespace reanimated
+{
 
 //
 // Copyright (c) 2013 Juan Palacios juan.palacios.puyana@gmail.com
@@ -70,16 +73,20 @@ class Queue
   std::condition_variable cond_;
 };
 
+class RuntimeManager;
 
 class Scheduler {
   public:
+    void scheduleOnJS(std::function<void()> job);
+    void setJSCallInvoker(std::shared_ptr<facebook::react::CallInvoker> jsCallInvoker);
+    void setRuntimeManager(std::shared_ptr<RuntimeManager> runtimeManager);
     virtual void scheduleOnUI(std::function<void()> job);
-    virtual void scheduleOnJS(std::function<void()> job);
     virtual void triggerUI();
-    virtual void triggerJS();
     virtual ~Scheduler();
-  //protected:
+  protected:
     Queue<std::function<void()>> uiJobs;
-    Queue<std::function<void()>> jsJobs;
+    std::shared_ptr<facebook::react::CallInvoker> jsCallInvoker_;
+    std::weak_ptr<RuntimeManager> runtimeManager;
 };
 
+}

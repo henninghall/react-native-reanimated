@@ -1,25 +1,22 @@
 package com.swmansion.reanimated;
 
+import android.os.SystemClock;
 import androidx.annotation.Nullable;
 
 import com.facebook.jni.HybridData;
 import com.facebook.proguard.annotations.DoNotStrip;
-import com.facebook.react.bridge.JSIModule;
+import com.facebook.react.bridge.JavaScriptExecutor;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.WritableArray;
 import com.facebook.react.bridge.WritableMap;
-import com.facebook.react.turbomodule.core.interfaces.TurboModule;
-import com.facebook.react.turbomodule.core.interfaces.TurboModuleRegistry;
+import com.facebook.react.turbomodule.core.CallInvokerHolderImpl;
 import com.facebook.react.uimanager.UIManagerModule;
 import com.facebook.react.uimanager.events.RCTEventEmitter;
 
 import java.lang.ref.WeakReference;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
 import java.util.Map;
 
-public class NativeProxy implements JSIModule, TurboModuleRegistry {
+public class NativeProxy {
 
   static {
     System.loadLibrary("reanimated");
@@ -71,14 +68,20 @@ public class NativeProxy implements JSIModule, TurboModuleRegistry {
   private final HybridData mHybridData;
   private NodesManager mNodesManager;
   private final WeakReference<ReactApplicationContext> mContext;
+  private Scheduler mScheduler = null;
 
   public NativeProxy(ReactApplicationContext context) {
-    mHybridData = initHybrid(context.getJavaScriptContextHolder().get(), new Scheduler(context));
+    CallInvokerHolderImpl holder = (CallInvokerHolderImpl)context.getCatalystInstance().getJSCallInvokerHolder();
+    mScheduler = new Scheduler(context);
+    mHybridData = initHybrid(context.getJavaScriptContextHolder().get(), holder, mScheduler);
     mContext = new WeakReference<>(context);
+    prepare();
   }
 
-  private native HybridData initHybrid(long jsContext, Scheduler scheduler);
+  private native HybridData initHybrid(long jsContext, CallInvokerHolderImpl jsCallInvokerHolder, Scheduler scheduler);
   private native void installJSIBindings();
+
+  public native boolean isAnyHandlerWaitingForEvent(String eventName);
 
   @DoNotStrip
   private void requestRender(AnimationFrameCallback callback) {
@@ -91,41 +94,38 @@ public class NativeProxy implements JSIModule, TurboModuleRegistry {
   }
 
   @DoNotStrip
+  private String obtainProp(int viewTag, String propName) {
+     return mNodesManager.obtainProp(viewTag, propName);
+  }
+
+  @DoNotStrip
+  private void scrollTo(int viewTag, double x, double y, boolean animated) {
+    mNodesManager.scrollTo(viewTag, x, y, animated);
+  }
+
+  @DoNotStrip
+  private String getUpTime() {
+    return Long.toString(SystemClock.uptimeMillis());
+  }
+
+  @DoNotStrip
+  private float[] measure(int viewTag) {
+    return mNodesManager.measure(viewTag);
+  }
+
+  @DoNotStrip
   private void registerEventHandler(EventHandler handler) {
     handler.mCustomEventNamesResolver = mNodesManager.getEventNameResolver();
     mNodesManager.registerEventHandler(handler);
   }
 
-  @Override
-  public void initialize() {
-
-  }
-
-  @Override
   public void onCatalystInstanceDestroy() {
+    mScheduler.deactivate();
     mHybridData.resetNative();
   }
 
-  @Override
-  public @Nullable TurboModule getModule(String moduleName) {
-    return null;
-  }
-
-  @Override
-  public Collection<TurboModule> getModules() {
-    return null;
-  }
-
-  @Override
-  public boolean hasModule(String moduleName) {
-    return false;
-  }
-
-  @Override
-  public List<String> getEagerInitModuleNames() {
+  public void prepare() {
     mNodesManager = mContext.get().getNativeModule(ReanimatedModule.class).getNodesManager();
     installJSIBindings();
-    
-    return new ArrayList<String>();
   }
 }

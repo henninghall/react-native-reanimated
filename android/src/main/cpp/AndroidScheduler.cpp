@@ -1,18 +1,14 @@
+#include "AndroidScheduler.h"
 #include <memory>
 #include <string>
-
 #include <fbjni/fbjni.h>
 #include <jsi/jsi.h>
-#include <hermes/hermes.h>
-
 #include <android/log.h>
 
-#include "AndroidScheduler.h"
+namespace reanimated {
 
 using namespace facebook;
 using namespace react;
-
-namespace reanimated {
 
 class SchedulerWrapper: public Scheduler {
 private:
@@ -26,11 +22,6 @@ public:
    void scheduleOnUI(std::function<void()> job) override {
      Scheduler::scheduleOnUI(job);
      scheduler_->cthis()->scheduleOnUI();
-   }
-
-   void scheduleOnJS(std::function<void()> job) override {
-     Scheduler::scheduleOnJS(job);
-     scheduler_->cthis()->scheduleOnJS();
    }
 
    ~SchedulerWrapper() {};
@@ -54,17 +45,8 @@ void AndroidScheduler::triggerUI() {
   scheduler_->triggerUI();
 }
 
-void AndroidScheduler::triggerJS() {
-  scheduler_->triggerJS();
-}
-
 void AndroidScheduler::scheduleOnUI() {
   static auto method = javaPart_->getClass()->getMethod<void()>("scheduleOnUI");
-  method(javaPart_.get());
-}
-
-void AndroidScheduler::scheduleOnJS() {
-  static auto method = javaPart_->getClass()->getMethod<void()>("scheduleOnJS");
   method(javaPart_.get());
 }
 
@@ -72,7 +54,6 @@ void AndroidScheduler::registerNatives() {
   registerHybrid({
     makeNativeMethod("initHybrid", AndroidScheduler::initHybrid),
     makeNativeMethod("triggerUI", AndroidScheduler::triggerUI),
-    makeNativeMethod("triggerJS", AndroidScheduler::triggerJS),
   });
 }
 

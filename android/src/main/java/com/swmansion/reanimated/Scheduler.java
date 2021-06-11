@@ -4,24 +4,22 @@ import com.facebook.jni.HybridData;
 import com.facebook.proguard.annotations.DoNotStrip;
 import com.facebook.react.bridge.ReactApplicationContext;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 public class Scheduler {
 
   @DoNotStrip
   @SuppressWarnings("unused")
   private final HybridData mHybridData;
   private final ReactApplicationContext mContext;
-
-  private final Runnable mJSThreadRunnable = new Runnable() {
-    @Override
-    public void run() {
-      triggerJS();
-    }
-  };
+  private final AtomicBoolean mActive = new AtomicBoolean(true);
 
   private final Runnable mUIThreadRunnable = new Runnable() {
     @Override
     public void run() {
-      triggerUI();
+      if (mActive.get()) {
+        triggerUI();
+      }
     }
   };
 
@@ -34,16 +32,12 @@ public class Scheduler {
 
   private native void triggerUI();
 
-  private native void triggerJS();
-
   @DoNotStrip
   private void scheduleOnUI() {
     mContext.runOnUiQueueThread(mUIThreadRunnable);
   }
 
-  @DoNotStrip
-  private void scheduleOnJS() {
-    mContext.runOnJSQueueThread(mJSThreadRunnable);
+  public void deactivate() {
+      mActive.set(false);
   }
-
 }

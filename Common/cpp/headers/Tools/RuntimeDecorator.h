@@ -1,18 +1,37 @@
 #pragma once
 
+#include "PlatformDepMethodsHolder.h"
 #include <stdio.h>
 #include <jsi/jsi.h>
 
-namespace reanimated {
-
 using namespace facebook;
 
-using UpdaterFunction = std::function<void(jsi::Runtime &rt, int viewTag, const jsi::Object& object)>;
+namespace reanimated {
+
 using RequestFrameFunction = std::function<void(std::function<void(double)>)>;
 
 class RuntimeDecorator {
 public:
-  static void addNativeObjects(jsi::Runtime &rt, UpdaterFunction updater, RequestFrameFunction requestFrame);
+  static void decorateRuntime(jsi::Runtime &rt, std::string label);
+  static void decorateUIRuntime(jsi::Runtime &rt,
+                                UpdaterFunction updater,
+                                RequestFrameFunction requestFrame,
+                                ScrollToFunction scrollTo,
+                                MeasuringFunction measure,
+                                TimeProviderFunction getCurrentTime);
+  
+  /**
+   Returns true if the given Runtime is the Reanimated UI-Thread Runtime.
+   */
+  static bool isUIRuntime(jsi::Runtime &rt);
+  /**
+   Returns true if the given Runtime is a Runtime that supports Workletization. (REA, Vision, ...)
+   */
+  static bool isWorkletRuntime(jsi::Runtime &rt);
+  /**
+   Returns true if the given Runtime is the default React-JS Runtime.
+   */
+  static bool isReactRuntime(jsi::Runtime &rt);
 };
 
 }

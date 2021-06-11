@@ -1,6 +1,6 @@
 import { AppRegistry, Platform } from 'react-native';
-import App from './src/henning/App';
 import { name as appName } from './app.json';
+import App from './src/henning/App';
 
 AppRegistry.registerComponent(appName, () => App);
 

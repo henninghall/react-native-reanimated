@@ -1,18 +1,24 @@
 #import "NativeProxy.h"
-#include <folly/json.h>
-#import <React/RCTFollyConvert.h>
-#import <React/RCTUIManager.h>
-#import "IOSScheduler.h"
-#import "IOSErrorHandler.h"
-#import <jsi/JSCRuntime.h>
-#import "RuntimeDecorator.h"
+#import "REAIOSScheduler.h"
+#import "REAIOSErrorHandler.h"
 #import "REAModule.h"
 #import "REANodesManager.h"
+#import "NativeMethods.h"
+#import <folly/json.h>
+#import <React/RCTFollyConvert.h>
+#import <React/RCTUIManager.h>
+
+#if __has_include(<hermes/hermes.h>)
+#import <hermes/hermes.h>
+#else
+#import <jsi/JSCRuntime.h>
+#endif
 
 namespace reanimated {
 
 using namespace facebook;
 using namespace react;
+
 
 // COPIED FROM RCTTurboModule.mm
 static id convertJSIValueToObjCObject(jsi::Runtime &runtime, const jsi::Value &value);
@@ -77,43 +83,86 @@ static id convertJSIValueToObjCObject(jsi::Runtime &runtime, const jsi::Value &v
 }
 
 std::shared_ptr<NativeReanimatedModule> createReanimatedModule(std::shared_ptr<CallInvoker> jsInvoker) {
-
-  RCTBridge *bridge;
-  if ([[UIApplication sharedApplication].delegate respondsToSelector:@selector(bridge)]) {
-    bridge = [[UIApplication sharedApplication].delegate performSelector:@selector(bridge) withObject:[UIApplication sharedApplication].delegate];
-  }
+  RCTBridge *bridge = _bridge_reanimated;
   REAModule *reanimatedModule = [bridge moduleForClass:[REAModule class]];
 
-  auto propUpdater = [reanimatedModule](jsi::Runtime &rt, int viewTag, const jsi::Object &props) -> void {
+  auto propUpdater = [reanimatedModule](jsi::Runtime &rt, int viewTag, const jsi::Value& viewName, const jsi::Object &props) -> void {
+    NSString *nsViewName = [NSString stringWithCString:viewName.asString(rt).utf8(rt).c_str() encoding:[NSString defaultCStringEncoding]];
+
     NSDictionary *propsDict = convertJSIObjectToNSDictionary(rt, props);
-    [reanimatedModule.nodesManager updateProps:propsDict ofViewWithTag:[NSNumber numberWithInt:viewTag] viewName:@"RCTView"];
+    [reanimatedModule.nodesManager updateProps:propsDict ofViewWithTag:[NSNumber numberWithInt:viewTag] withName:nsViewName];
   };
 
-  auto requestRender = [reanimatedModule](std::function<void(double)> onRender) {
+
+  RCTUIManager *uiManager = reanimatedModule.nodesManager.uiManager;
+  auto measuringFunction = [uiManager](int viewTag) -> std::vector<std::pair<std::string, double>> {
+    return measure(viewTag, uiManager);
+  };
+
+  auto scrollToFunction = [uiManager](int viewTag, double x, double y, bool animated) {
+    scrollTo(viewTag, uiManager, x, y, animated);
+  };
+
+  auto propObtainer = [reanimatedModule](jsi::Runtime &rt, const int viewTag, const jsi::String &propName) -> jsi::Value {
+    NSString* propNameConverted = [NSString stringWithFormat:@"%s",propName.utf8(rt).c_str()];
+      std::string resultStr = std::string([[reanimatedModule.nodesManager obtainProp:[NSNumber numberWithInt:viewTag] propName:propNameConverted] UTF8String]);
+      jsi::Value val = jsi::String::createFromUtf8(rt, resultStr);
+      return val;
+  };
+
+
+#if __has_include(<hermes/hermes.h>)
+  std::unique_ptr<jsi::Runtime> animatedRuntime = facebook::hermes::makeHermesRuntime();
+#else
+  std::unique_ptr<jsi::Runtime> animatedRuntime = facebook::jsc::makeJSCRuntime();
+#endif
+
+  std::shared_ptr<Scheduler> scheduler = std::make_shared<REAIOSScheduler>(jsInvoker);
+  std::shared_ptr<ErrorHandler> errorHandler = std::make_shared<REAIOSErrorHandler>(scheduler);
+  std::shared_ptr<NativeReanimatedModule> module;
+
+  auto requestRender = [reanimatedModule, &module](std::function<void(double)> onRender, jsi::Runtime &rt) {
     [reanimatedModule.nodesManager postOnAnimation:^(CADisplayLink *displayLink) {
-      onRender(displayLink.timestamp * 1000.0);
+      double frameTimestamp = displayLink.targetTimestamp * 1000;
+      rt.global().setProperty(rt, "_frameTimestamp", frameTimestamp);
+      onRender(frameTimestamp);
+      rt.global().setProperty(rt, "_frameTimestamp", jsi::Value::undefined());
     }];
   };
 
-  std::shared_ptr<Scheduler> scheduler(new IOSScheduler(jsInvoker));
-  std::unique_ptr<jsi::Runtime> animatedRuntime = facebook::jsc::makeJSCRuntime();
+  auto getCurrentTime = []() {
+    return CACurrentMediaTime() * 1000;
+  };
 
-  std::shared_ptr<NativeReanimatedModule> module(new NativeReanimatedModule(jsInvoker,
-                                                                            scheduler,
-                                                                            std::move(animatedRuntime),
-                                                                            requestRender,
-                                                                            propUpdater));
+  PlatformDepMethodsHolder platformDepMethodsHolder = {
+    requestRender,
+    propUpdater,
+    scrollToFunction,
+    measuringFunction,
+    getCurrentTime,
+  };
+
+  module = std::make_shared<NativeReanimatedModule>(jsInvoker,
+                                                    scheduler,
+                                                    std::move(animatedRuntime),
+                                                    errorHandler,
+                                                    propObtainer,
+                                                    platformDepMethodsHolder
+                                                    );
+
+  scheduler->setRuntimeManager(module);
 
   [reanimatedModule.nodesManager registerEventHandler:^(NSString *eventName, id<RCTEvent> event) {
     std::string eventNameString([eventName UTF8String]);
     std::string eventAsString = folly::toJson(convertIdToFollyDynamic([event arguments][2]));
 
     eventAsString = "{ NativeMap:"  + eventAsString + "}";
+    module->runtime->global().setProperty(*module->runtime, "_eventTimestamp", CACurrentMediaTime() * 1000);
     module->onEvent(eventNameString, eventAsString);
+    module->runtime->global().setProperty(*module->runtime, "_eventTimestamp", jsi::Value::undefined());
   }];
 
   return module;
 }
 
 }
-

@@ -6,6 +6,8 @@
 
 typedef void (^AnimatedOperation)(REANodesManager *nodesManager);
 
+RCTBridge *_bridge_reanimated = nil;
+
 @implementation REAModule
 {
   NSMutableArray<AnimatedOperation> *_operations;
@@ -16,9 +18,9 @@ RCT_EXPORT_MODULE(ReanimatedModule);
 
 - (void)invalidate
 {
+  _bridge_reanimated = nil;
   _transitionManager = nil;
   [_nodesManager invalidate];
-  [self.bridge.eventDispatcher removeDispatchObserver:self];
   [self.bridge.uiManager.observerCoordinator removeObserver:self];
 }
 
@@ -40,7 +42,6 @@ RCT_EXPORT_MODULE(ReanimatedModule);
 
   _transitionManager = [[REATransitionManager alloc] initWithUIManager:self.bridge.uiManager];
 
-  [bridge.eventDispatcher addDispatchObserver:self];
   [bridge.uiManager.observerCoordinator addObserver:self];
 }
 
